@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <PlatformTarget>x64</PlatformTarget>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationManifest Condition="'$(AsInvoker)' == 'true'">app.asinvoker.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\JinjaDisk.ico</ApplicationIcon>
+    <AssemblyName>JinjaDisk</AssemblyName>
+    <RootNamespace>JinjaDisk</RootNamespace>
+    <Version>1.0.0</Version>
+    <Product>JinjaDisk</Product>
+    <TieredPGO>true</TieredPGO>
+    <TieredCompilation>true</TieredCompilation>
+    <ConcurrentGarbageCollection>true</ConcurrentGarbageCollection>
+    <SatelliteResourceLanguages>tr;en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\JinjaDisk.ico" />
+    <Compile Remove="tools\**" />
+    <None Remove="tools\**" />
+    <Page Remove="tools\**" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,770 @@
+<Window x:Class="JinjaDisk.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="clr-namespace:JinjaDisk.UI"
+        Title="JinjaDisk" Width="1400" Height="880" MinWidth="1060" MinHeight="660"
+        Background="{StaticResource Bg}" WindowStartupLocation="CenterScreen"
+        Icon="Assets/JinjaDisk.ico"
+        FontFamily="{StaticResource UiFont}" Foreground="{StaticResource Text}"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="44" ResizeBorderThickness="6" GlassFrameThickness="0" CornerRadius="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
+
+    <Window.Resources>
+        <!-- Ortak bağlam menüsü -->
+        <ContextMenu x:Key="ItemMenu">
+            <MenuItem Header="Aç" Tag="&#xE8E5;" Click="Ctx_Open"/>
+            <MenuItem Header="Klasörde göster" Tag="&#xE838;" Click="Ctx_Reveal"/>
+            <MenuItem Header="Disk haritasında göster" Tag="&#xE80A;" Click="Ctx_ShowInMap"/>
+            <MenuItem Header="Yolu kopyala" Tag="&#xE8C8;" Click="Ctx_CopyPath"/>
+            <Separator/>
+            <MenuItem Header="Geri dönüşüm kutusuna gönder" Tag="&#xE74D;" Click="Ctx_Recycle"/>
+            <MenuItem Header="Kalıcı olarak sil" Tag="&#xE711;" Foreground="#FF8C9B" Click="Ctx_Delete"/>
+        </ContextMenu>
+
+        <!-- Yatay oranlı çubuk satırı -->
+        <DataTemplate x:Key="BarTemplate">
+            <Border Background="Transparent" Padding="6,7" CornerRadius="8" Cursor="Hand" Tag="{Binding}" MouseLeftButtonUp="Bar_Click">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#1F2533"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="26"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" Foreground="{Binding Color}" FontSize="14"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis" MaxWidth="320"/>
+                        <TextBlock Text="{Binding Sub}" FontSize="11.5" Foreground="{StaticResource Muted}" Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="2" Text="{Binding Value}" FontSize="13" FontWeight="SemiBold" Margin="10,0,0,0"/>
+                    <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Height="5" Margin="0,6,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{Binding BarStar}"/>
+                            <ColumnDefinition Width="{Binding RestStar}"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.ColumnSpan="2" CornerRadius="3" Background="#232938"/>
+                        <Border CornerRadius="3" Background="{Binding Color}"/>
+                    </Grid>
+                </Grid>
+            </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="CleanTemplate">
+            <Grid Height="36">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="34"/>
+                    <ColumnDefinition Width="30"/>
+                    <ColumnDefinition Width="1.1*"/>
+                    <ColumnDefinition Width="1.6*"/>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="130"/>
+                </Grid.ColumnDefinitions>
+                <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding Glyph}" Style="{StaticResource Icon}" Foreground="{Binding IconBrush}"/>
+                <TextBlock Grid.Column="2" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="13" Margin="0,0,10,0"/>
+                <TextBlock Grid.Column="3" Text="{Binding Folder}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{StaticResource SubText}" Margin="0,0,10,0"/>
+                <TextBlock Grid.Column="4" Text="{Binding SizeText}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="13" FontWeight="SemiBold" Margin="0,0,14,0"/>
+                <TextBlock Grid.Column="5" Text="{Binding DateText}" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SubText}"/>
+            </Grid>
+        </DataTemplate>
+    </Window.Resources>
+
+    <Border x:Name="RootBorder" Background="{StaticResource Bg}">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="236"/>
+                <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+
+            <!-- ================= KENAR ÇUBUĞU ================= -->
+            <Border Background="{StaticResource Sidebar}" BorderBrush="{StaticResource Border}" BorderThickness="0,0,1,0">
+                <Grid Margin="14,0,14,16">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Margin="6,16,0,26">
+                        <Border Width="38" Height="38" CornerRadius="11" Background="{StaticResource AccentGradient}">
+                            <TextBlock Text="&#xEDA2;" FontFamily="{StaticResource IconFont}" FontSize="19" Foreground="White"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="JinjaDisk" FontFamily="{StaticResource DisplayFont}" FontSize="18" FontWeight="Bold"/>
+                            <TextBlock Text="Ara · Analiz et · Temizle" FontSize="11" Foreground="{StaticResource SubText}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1">
+                        <TextBlock Text="MENÜ" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource Muted}" Margin="12,0,0,8"/>
+                        <RadioButton x:Name="NavOverview" Style="{StaticResource NavItem}" GroupName="nav" Content="Genel Bakış" Tag="&#xE80F;" IsChecked="True" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavSearch" Style="{StaticResource NavItem}" GroupName="nav" Content="Dosya Ara" Tag="&#xE721;" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavMap" Style="{StaticResource NavItem}" GroupName="nav" Content="Disk Haritası" Tag="&#xF0E2;" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavTypes" Style="{StaticResource NavItem}" GroupName="nav" Content="Dosya Türleri" Tag="&#xE8FD;" Checked="Nav_Checked"/>
+                        <RadioButton x:Name="NavClean" Style="{StaticResource NavItem}" GroupName="nav" Content="Temizlik" Tag="&#xE74D;" Checked="Nav_Checked"/>
+                    </StackPanel>
+
+                    <Border Grid.Row="2" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="14" Padding="14">
+                        <StackPanel>
+                            <TextBlock Text="TARANACAK SÜRÜCÜ" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource Muted}" Margin="0,0,0,8"/>
+                            <ComboBox x:Name="DriveCombo" Height="36" DisplayMemberPath="Title"/>
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="ScanBtn" Style="{StaticResource BtnPrimary}" Click="ScanBtn_Click" Height="36">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock x:Name="ScanBtnIcon" Text="&#xE72C;" FontFamily="{StaticResource IconFont}" FontSize="13" Foreground="White" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="ScanBtnText" Text="Tara" Foreground="White" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button Grid.Column="1" Margin="8,0,0,0" Height="36" Width="40" Padding="0" Click="FolderScan_Click" ToolTip="Tek bir klasörü tara">
+                                    <TextBlock Text="&#xE8DA;" FontFamily="{StaticResource IconFont}" FontSize="14"/>
+                                </Button>
+                            </Grid>
+                            <ProgressBar x:Name="ScanProgressBar" Margin="0,12,0,0" Maximum="1" Visibility="Collapsed"/>
+                            <TextBlock x:Name="StatusText" Text="Hazır" FontSize="11.5" Foreground="{StaticResource SubText}" Margin="0,8,0,0" TextWrapping="Wrap"/>
+                            <Border x:Name="ModeBadge" CornerRadius="6" Padding="8,4" Margin="0,10,0,0" HorizontalAlignment="Left" Background="#16302A">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="ModeBadgeIcon" Text="&#xE945;" FontFamily="{StaticResource IconFont}" FontSize="11" Foreground="{StaticResource Success}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="ModeBadgeText" Text="Hızlı MFT modu" FontSize="11" Foreground="{StaticResource Success}" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- ================= ANA ALAN ================= -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="44"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Başlık çubuğu -->
+                <Grid>
+                    <TextBlock x:Name="TitleInfo" Text="" FontSize="12" Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="28,0,0,0"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top">
+                        <Button Style="{StaticResource TitleBtn}" Content="&#xE921;" Click="Min_Click"/>
+                        <Button x:Name="MaxBtn" Style="{StaticResource TitleBtn}" Content="&#xE922;" Click="Max_Click"/>
+                        <Button x:Name="CloseBtn" Style="{StaticResource TitleBtn}" Content="&#xE8BB;" Click="Close_Click"/>
+                    </StackPanel>
+                </Grid>
+
+                <Grid Grid.Row="1" Margin="30,0,30,24">
+
+                    <!-- ========== GENEL BAKIŞ ========== -->
+                    <ScrollViewer x:Name="PageOverview" VerticalScrollBarVisibility="Auto">
+                        <StackPanel Margin="0,0,6,0">
+                            <TextBlock Text="Genel Bakış" Style="{StaticResource H1}"/>
+                            <TextBlock Text="Sürücülerin ve en çok yer kaplayan şeylerin özeti." Style="{StaticResource Sub}" Margin="0,4,0,20"/>
+
+                            <ItemsControl x:Name="DrivesList">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Style="{StaticResource CardBorder}" Width="318" Margin="0,0,14,14">
+                                            <StackPanel>
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Width="40" Height="40" CornerRadius="10" Background="{StaticResource AccentSoft}">
+                                                        <TextBlock Text="&#xEDA2;" Style="{StaticResource Icon}" FontSize="18" Foreground="{StaticResource Accent2}" HorizontalAlignment="Center"/>
+                                                    </Border>
+                                                    <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Title}" FontSize="14.5" FontWeight="SemiBold"/>
+                                                        <TextBlock Text="{Binding Sub}" FontSize="11.5" Foreground="{StaticResource SubText}"/>
+                                                    </StackPanel>
+                                                    <Button Grid.Column="2" Content="Tara" Tag="{Binding Root}" Click="DriveScan_Click" Padding="14,6"/>
+                                                </Grid>
+                                                <Grid Height="8" Margin="0,16,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="{Binding BarStar}"/>
+                                                        <ColumnDefinition Width="{Binding RestStar}"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Border Grid.ColumnSpan="2" CornerRadius="4" Background="#232938"/>
+                                                    <Border CornerRadius="4" Background="{Binding BarBrush}"/>
+                                                </Grid>
+                                                <Grid>
+                                                    <TextBlock Text="{Binding UsedText}" FontSize="12" Foreground="{StaticResource SubText}"/>
+                                                    <TextBlock Text="{Binding FreeText}" FontSize="12" FontWeight="SemiBold" HorizontalAlignment="Right"/>
+                                                </Grid>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <Border x:Name="OverviewEmpty" Style="{StaticResource CardBorder}" Padding="28" Margin="0,4,14,0">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <TextBlock Text="&#xE9F9;" Style="{StaticResource Icon}" FontSize="34" Foreground="{StaticResource Accent2}" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="Bir sürücü tarandığında dağılım burada görünecek" Style="{StaticResource H2}" HorizontalAlignment="Center" Margin="0,12,0,4"/>
+                                    <TextBlock Text="Yönetici modunda NTFS sürücüler, MFT doğrudan okunarak birkaç saniyede taranır." Style="{StaticResource Sub}" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+
+                            <StackPanel x:Name="OverviewScanned" Visibility="Collapsed" Margin="0,0,14,0">
+                                <UniformGrid Columns="4" Margin="0,0,-14,14">
+                                    <Border Style="{StaticResource CardBorder}" Margin="0,0,14,0">
+                                        <StackPanel>
+                                            <TextBlock Text="DOSYA" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource Muted}"/>
+                                            <TextBlock x:Name="StatFiles" Text="0" Style="{StaticResource Big}" Margin="0,6,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource CardBorder}" Margin="0,0,14,0">
+                                        <StackPanel>
+                                            <TextBlock Text="KLASÖR" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource Muted}"/>
+                                            <TextBlock x:Name="StatDirs" Text="0" Style="{StaticResource Big}" Margin="0,6,0,0"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource CardBorder}" Margin="0,0,14,0">
+                                        <StackPanel>
+                                            <TextBlock Text="TARANAN ALAN" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource Muted}"/>
+                                            <TextBlock x:Name="StatSize" Text="0" Style="{StaticResource Big}" Margin="0,6,0,0"/>
+                                            <TextBlock x:Name="StatSizeSub" Text="" Style="{StaticResource Sub}"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Style="{StaticResource CardBorder}" Margin="0,0,14,0">
+                                        <StackPanel>
+                                            <TextBlock Text="TARAMA SÜRESİ" FontSize="10.5" FontWeight="SemiBold" Foreground="{StaticResource Muted}"/>
+                                            <TextBlock x:Name="StatTime" Text="0" Style="{StaticResource Big}" Margin="0,6,0,0"/>
+                                            <TextBlock x:Name="StatTimeSub" Text="" Style="{StaticResource Sub}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </UniformGrid>
+
+                                <Grid Margin="0,0,0,14">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="14"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Style="{StaticResource CardBorder}">
+                                        <StackPanel>
+                                            <TextBlock Text="Türlere göre dağılım" Style="{StaticResource H2}"/>
+                                            <TextBlock Text="Hangi tür dosyalar ne kadar yer kaplıyor" Style="{StaticResource Sub}" Margin="0,2,0,12"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="190"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <ui:DonutChart x:Name="Donut" Width="180" Height="180" VerticalAlignment="Top" Margin="0,6,0,0"/>
+                                                <ItemsControl x:Name="CategoryBars" Grid.Column="1" ItemTemplate="{StaticResource BarTemplate}" Margin="8,0,0,0"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Column="2" Style="{StaticResource CardBorder}">
+                                        <StackPanel>
+                                            <TextBlock Text="En büyük klasörler" Style="{StaticResource H2}"/>
+                                            <TextBlock Text="Sürücünün kökündeki klasörler — tıkla, haritada aç" Style="{StaticResource Sub}" Margin="0,2,0,12"/>
+                                            <ItemsControl x:Name="TopFoldersList" ItemTemplate="{StaticResource BarTemplate}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <Border Style="{StaticResource CardBorder}">
+                                    <StackPanel>
+                                        <Grid>
+                                            <StackPanel>
+                                                <TextBlock Text="En büyük dosyalar" Style="{StaticResource H2}"/>
+                                                <TextBlock Text="Tüm sürücüdeki en ağır 15 dosya — tıkla, haritada göster" Style="{StaticResource Sub}" Margin="0,2,0,12"/>
+                                            </StackPanel>
+                                            <Button Content="Tümünü gör" HorizontalAlignment="Right" VerticalAlignment="Top" Click="ShowBigFiles_Click"/>
+                                        </Grid>
+                                        <ItemsControl x:Name="TopFilesList" ItemTemplate="{StaticResource BarTemplate}"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- ========== ARA ========== -->
+                    <Grid x:Name="PageSearch" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Dosya Ara" Style="{StaticResource H1}"/>
+                            <TextBlock Text="Yazdıkça anında sonuç. Tüm sürücü bellekte indekslenir." Style="{StaticResource Sub}" Margin="0,4,0,16"/>
+                        </StackPanel>
+                        <Grid Grid.Row="1">
+                            <TextBox x:Name="SearchBox" FontSize="16" Padding="44,12,12,12" TextChanged="SearchBox_TextChanged" PreviewKeyDown="SearchBox_PreviewKeyDown"/>
+                            <TextBlock Text="&#xE721;" Style="{StaticResource Icon}" Margin="16,0,0,0" FontSize="16" IsHitTestVisible="False"/>
+                            <TextBlock x:Name="SearchPlaceholder" Text="Dosya veya klasör adı yaz…  (örn: *.mp4, ext:zip;rar, size:>1gb, \Downloads\)"
+                                       Foreground="{StaticResource Muted}" FontSize="15" Margin="46,0,0,0" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                        </Grid>
+                        <Grid Grid.Row="2" Margin="0,12,0,8">
+                            <WrapPanel x:Name="Chips">
+                                <Button Style="{StaticResource BtnBase}" Padding="10,4" Margin="0,0,6,4" FontSize="12" Content="Videolar" Tag="ext:mp4;mkv;avi;mov;wmv;webm" Click="Chip_Click"/>
+                                <Button Style="{StaticResource BtnBase}" Padding="10,4" Margin="0,0,6,4" FontSize="12" Content="Arşiv / ISO" Tag="ext:zip;rar;7z;iso;tar;gz" Click="Chip_Click"/>
+                                <Button Style="{StaticResource BtnBase}" Padding="10,4" Margin="0,0,6,4" FontSize="12" Content="Kurulum dosyaları" Tag="ext:exe;msi" Click="Chip_Click"/>
+                                <Button Style="{StaticResource BtnBase}" Padding="10,4" Margin="0,0,6,4" FontSize="12" Content="1 GB üstü" Tag="size:>1gb" Click="Chip_Click"/>
+                                <Button Style="{StaticResource BtnBase}" Padding="10,4" Margin="0,0,6,4" FontSize="12" Content="Sadece klasörler" Tag="folder:" Click="Chip_Click"/>
+                                <Button Style="{StaticResource BtnBase}" Padding="10,4" Margin="0,0,6,4" FontSize="12" Content="İndirilenler içinde" Tag="\Downloads\" Click="Chip_Click"/>
+                                <Button Style="{StaticResource BtnGhost}" Padding="10,4" Margin="0,0,6,4" FontSize="12" Foreground="{StaticResource SubText}" Content="Temizle" Tag="" Click="ChipClear_Click"/>
+                            </WrapPanel>
+                            <TextBlock x:Name="ResultCount" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SubText}"/>
+                        </Grid>
+                        <Border Grid.Row="3" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="12,0,22,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="30"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="1.3*"/>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="140"/>
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="1" Style="{StaticResource HeaderBtn}" Content="Ad" Tag="Name" Click="SortHeader_Click" x:Name="HdrName"/>
+                                <Button Grid.Column="2" Style="{StaticResource HeaderBtn}" Content="Klasör" Tag="Folder" Click="SortHeader_Click" x:Name="HdrFolder"/>
+                                <Button Grid.Column="3" Style="{StaticResource HeaderBtn}" Content="Boyut" Tag="Size" Click="SortHeader_Click" x:Name="HdrSize" HorizontalContentAlignment="Right" Margin="0,0,14,0"/>
+                                <Button Grid.Column="4" Style="{StaticResource HeaderBtn}" Content="Değiştirilme" Tag="Date" Click="SortHeader_Click" x:Name="HdrDate"/>
+                            </Grid>
+                        </Border>
+                        <Grid Grid.Row="4">
+                            <ListBox x:Name="SearchList" Style="{StaticResource VList}" Margin="0,6,0,0" SelectionMode="Extended"
+                                     ContextMenu="{StaticResource ItemMenu}" MouseDoubleClick="List_DoubleClick" KeyDown="List_KeyDown">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid Height="34">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="30"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="1.3*"/>
+                                                <ColumnDefinition Width="110"/>
+                                                <ColumnDefinition Width="140"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" Foreground="{Binding IconBrush}" FontSize="15"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis" Margin="0,0,12,0"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding Folder}" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SubText}" TextTrimming="CharacterEllipsis" Margin="0,0,12,0"/>
+                                            <TextBlock Grid.Column="3" Text="{Binding SizeText}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="13" Margin="0,0,14,0"/>
+                                            <TextBlock Grid.Column="4" Text="{Binding DateText}" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SubText}"/>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                            <StackPanel x:Name="SearchEmpty" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False">
+                                <TextBlock Text="&#xE721;" Style="{StaticResource Icon}" FontSize="40" Foreground="#2E3546" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="SearchEmptyText" Text="Aramak için yazmaya başla" Foreground="{StaticResource Muted}" FontSize="14" Margin="0,12,0,0" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Grid>
+                    </Grid>
+
+                    <!-- ========== DİSK HARİTASI ========== -->
+                    <Grid x:Name="PageMap" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <Grid Margin="0,0,0,14">
+                            <StackPanel>
+                                <TextBlock Text="Disk Haritası" Style="{StaticResource H1}"/>
+                                <TextBlock Text="Klasörler boyuta göre sıralı. Sağdaki harita: her kutu bir dosya/klasör, alanı = kapladığı yer. Çift tıkla içine gir." Style="{StaticResource Sub}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Grid>
+                        <Grid Grid.Row="1">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="5*" MinWidth="380"/>
+                                <ColumnDefinition Width="14"/>
+                                <ColumnDefinition Width="6*" MinWidth="300"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Style="{StaticResource CardBorder}" Padding="0,8,0,4">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Border BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="14,0,24,2">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="90"/>
+                                                <ColumnDefinition Width="118"/>
+                                                <ColumnDefinition Width="76"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="Ad" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubText}" Margin="0,6"/>
+                                            <TextBlock Grid.Column="1" Text="Diskte" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubText}" HorizontalAlignment="Right" Margin="0,6,12,6"/>
+                                            <TextBlock Grid.Column="2" Text="Üst klasöre oranı" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubText}" Margin="0,6"/>
+                                            <TextBlock Grid.Column="3" Text="Dosya" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubText}" HorizontalAlignment="Right" Margin="0,6"/>
+                                        </Grid>
+                                    </Border>
+                                    <ListBox x:Name="TreeList" Grid.Row="1" Style="{StaticResource VList}" Margin="0,4,0,0" SelectionMode="Extended"
+                                             ContextMenu="{StaticResource ItemMenu}" SelectionChanged="TreeList_SelectionChanged"
+                                             MouseDoubleClick="List_DoubleClick" KeyDown="List_KeyDown">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Height="32">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="90"/>
+                                                        <ColumnDefinition Width="118"/>
+                                                        <ColumnDefinition Width="76"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Orientation="Horizontal" Margin="{Binding Indent}">
+                                                        <Border Width="22" Height="22" Background="Transparent" Cursor="Hand" Visibility="{Binding ChevronVisibility}"
+                                                                Tag="{Binding}" MouseLeftButtonDown="Chevron_Click" CornerRadius="5">
+                                                            <TextBlock Text="{Binding Chevron}" FontFamily="{StaticResource IconFont}" FontSize="9" Foreground="{StaticResource SubText}"
+                                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" Foreground="{Binding IconBrush}" FontSize="15" Margin="4,0,8,0"/>
+                                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="1" Text="{Binding SizeText}" FontSize="13" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                                                        <Grid Width="70" Height="6">
+                                                            <Border CornerRadius="3" Background="#232938"/>
+                                                            <Border CornerRadius="3" Background="{StaticResource BarGradient}" HorizontalAlignment="Left" Width="{Binding BarWidth}"/>
+                                                        </Grid>
+                                                        <TextBlock Text="{Binding PercentText}" FontSize="11.5" Foreground="{StaticResource SubText}" Margin="8,0,0,0"/>
+                                                    </StackPanel>
+                                                    <TextBlock Grid.Column="3" Text="{Binding FilesText}" FontSize="12" Foreground="{StaticResource SubText}" HorizontalAlignment="Right" VerticalAlignment="Center"/>
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                    <TextBlock x:Name="MapEmpty" Grid.Row="1" Text="Önce bir sürücü tara" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
+                            <GridSplitter Grid.Column="1" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"/>
+                            <Border Grid.Column="2" Style="{StaticResource CardBorder}" Padding="10">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid Margin="2,0,2,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Button Style="{StaticResource BtnBase}" Padding="9,5" Click="MapUp_Click" ToolTip="Üst klasör">
+                                            <TextBlock Text="&#xE74A;" FontFamily="{StaticResource IconFont}" FontSize="12"/>
+                                        </Button>
+                                        <StackPanel Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
+                                            <TextBlock x:Name="MapRootName" Text="" FontSize="13.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock x:Name="MapRootSub" Text="" FontSize="11.5" Foreground="{StaticResource SubText}" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Style="{StaticResource BtnBase}" Padding="10,5" Click="MapHome_Click" FontSize="12">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE80F;" FontFamily="{StaticResource IconFont}" FontSize="12" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Kök"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </Grid>
+                                    <Border Grid.Row="1" CornerRadius="8" ClipToBounds="True" Background="#0F1219">
+                                        <ui:TreemapControl x:Name="Map"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        <Grid Grid.Row="2" Margin="2,10,0,0">
+                            <TextBlock x:Name="MapHover" Text=" " FontSize="12" Foreground="{StaticResource SubText}" TextTrimming="CharacterEllipsis"/>
+                            <ItemsControl x:Name="Legend" HorizontalAlignment="Right">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal" Margin="12,0,0,0">
+                                            <Border Width="9" Height="9" CornerRadius="2" Background="{Binding Color}" VerticalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Title}" FontSize="11" Foreground="{StaticResource SubText}" Margin="5,0,0,0"/>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Grid>
+                    </Grid>
+
+                    <!-- ========== DOSYA TÜRLERİ ========== -->
+                    <Grid x:Name="PageTypes" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel>
+                            <TextBlock Text="Dosya Türleri" Style="{StaticResource H1}"/>
+                            <TextBlock Text="Uzantılara göre toplam kaplanan alan. Bir satıra çift tıkla: o türdeki tüm dosyaları büyükten küçüğe listeler." Style="{StaticResource Sub}" Margin="0,4,0,16"/>
+                        </StackPanel>
+                        <ItemsControl x:Name="CategoryCards" Grid.Row="1" Margin="0,0,0,12">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><UniformGrid Columns="5"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Style="{StaticResource CardBorder}" Padding="14,12" Margin="0,0,10,10" Cursor="Hand" Tag="{Binding}" MouseLeftButtonUp="Bar_Click">
+                                        <StackPanel>
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" Foreground="{Binding Color}" FontSize="14"/>
+                                                <TextBlock Text="{Binding Title}" FontSize="12.5" Foreground="{StaticResource SubText}" Margin="8,0,0,0"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Value}" FontSize="19" FontWeight="Bold" Margin="0,6,0,0" FontFamily="{StaticResource DisplayFont}"/>
+                                            <TextBlock Text="{Binding Sub}" FontSize="11" Foreground="{StaticResource Muted}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Grid.Row="2" BorderBrush="{StaticResource Border}" BorderThickness="0,0,0,1" Padding="12,0,22,0">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="30"/>
+                                    <ColumnDefinition Width="160"/>
+                                    <ColumnDefinition Width="150"/>
+                                    <ColumnDefinition Width="120"/>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="1" Text="Uzantı" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubText}" Margin="0,6"/>
+                                <TextBlock Grid.Column="2" Text="Kategori" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubText}" Margin="0,6"/>
+                                <TextBlock Grid.Column="3" Text="Dosya sayısı" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubText}" HorizontalAlignment="Right" Margin="0,6,16,6"/>
+                                <TextBlock Grid.Column="4" Text="Toplam" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubText}" HorizontalAlignment="Right" Margin="0,6,16,6"/>
+                                <TextBlock Grid.Column="5" Text="Oran" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource SubText}" Margin="0,6"/>
+                            </Grid>
+                        </Border>
+                        <ListBox x:Name="TypesList" Grid.Row="3" Style="{StaticResource VList}" Margin="0,6,0,0" MouseDoubleClick="Types_DoubleClick">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Height="34">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="30"/>
+                                            <ColumnDefinition Width="160"/>
+                                            <ColumnDefinition Width="150"/>
+                                            <ColumnDefinition Width="120"/>
+                                            <ColumnDefinition Width="110"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Glyph}" Style="{StaticResource Icon}" Foreground="{Binding Color}" FontSize="15"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding Title}" VerticalAlignment="Center" FontSize="13" FontWeight="SemiBold"/>
+                                        <TextBlock Grid.Column="2" Text="{Binding Tag}" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource SubText}"/>
+                                        <TextBlock Grid.Column="3" Text="{Binding Sub}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="12" Foreground="{StaticResource SubText}" Margin="0,0,16,0"/>
+                                        <TextBlock Grid.Column="4" Text="{Binding Value}" VerticalAlignment="Center" HorizontalAlignment="Right" FontSize="13" FontWeight="SemiBold" Margin="0,0,16,0"/>
+                                        <Grid Grid.Column="5" Height="6" VerticalAlignment="Center" MaxWidth="360" HorizontalAlignment="Left" Width="360">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="{Binding BarStar}"/>
+                                                <ColumnDefinition Width="{Binding RestStar}"/>
+                                            </Grid.ColumnDefinitions>
+                                            <Border Grid.ColumnSpan="2" CornerRadius="3" Background="#232938"/>
+                                            <Border CornerRadius="3" Background="{Binding Color}"/>
+                                        </Grid>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </Grid>
+
+                    <!-- ========== TEMİZLİK ========== -->
+                    <Grid x:Name="PageClean" Visibility="Collapsed">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <Grid Margin="0,0,0,16">
+                            <StackPanel>
+                                <TextBlock Text="Temizlik" Style="{StaticResource H1}"/>
+                                <TextBlock Text="Gereksiz dosyaları bul, gözden geçir, sil. Hiçbir şey sen onaylamadan silinmez." Style="{StaticResource Sub}" Margin="0,4,0,0"/>
+                            </StackPanel>
+                            <Border HorizontalAlignment="Right" VerticalAlignment="Center" Background="{StaticResource Panel}" BorderBrush="{StaticResource Border}" BorderThickness="1" CornerRadius="10" Padding="4">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="ModeRecycle" Style="{StaticResource Pill}" GroupName="delmode" Content="Geri dönüşüm kutusuna gönder" IsChecked="True"
+                                                 ToolTip="Güvenli: geri alınabilir, ama yer ancak kutu boşaltılınca açılır"/>
+                                    <RadioButton x:Name="ModePermanent" Style="{StaticResource Pill}" GroupName="delmode" Content="Kalıcı sil (yer hemen açılır)"/>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <UniformGrid Grid.Row="1" Columns="3" Margin="0,0,-14,0">
+                            <!-- Geri dönüşüm kutusu -->
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,14,14">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE74D;" Style="{StaticResource Icon}" Foreground="{StaticResource Accent2}"/>
+                                        <TextBlock Text="Geri Dönüşüm Kutusu" Style="{StaticResource H2}" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Margin="0,10,0,12">
+                                        <TextBlock x:Name="RbSize" Text="—" Style="{StaticResource Big}"/>
+                                        <TextBlock x:Name="RbSub" Text="" Style="{StaticResource Sub}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                                        <Button Style="{StaticResource BtnDanger}" Content="Boşalt" Click="RecycleEmpty_Click"/>
+                                        <Button Style="{StaticResource BtnGhost}" Margin="6,0,0,0" Click="RecycleRefresh_Click" ToolTip="Yenile">
+                                            <TextBlock Text="&#xE72C;" FontFamily="{StaticResource IconFont}" FontSize="13"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Geçici dosyalar -->
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,14,14">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE823;" Style="{StaticResource Icon}" Foreground="{StaticResource Warn}"/>
+                                        <TextBlock Text="Geçici dosyalar &amp; önbellekler" Style="{StaticResource H2}" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Margin="0,10,0,12">
+                                        <TextBlock x:Name="TempSize" Text="—" Style="{StaticResource Big}"/>
+                                        <TextBlock x:Name="TempSub" Text="Windows Temp, güncelleme önbelleği, hata raporları…" Style="{StaticResource Sub}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                                        <Button Style="{StaticResource BtnPrimary}" Content="İncele" Click="TempReview_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- İndirilenler -->
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,14,14">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE896;" Style="{StaticResource Icon}" Foreground="{StaticResource Success}"/>
+                                        <TextBlock Text="İndirilenler" Style="{StaticResource H2}" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Margin="0,10,0,12">
+                                        <TextBlock x:Name="DlSize" Text="—" Style="{StaticResource Big}"/>
+                                        <TextBlock x:Name="DlSub" Text="" Style="{StaticResource Sub}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                                        <Button Style="{StaticResource BtnPrimary}" Content="İncele" Click="DownloadsReview_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Boş dosyalar -->
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,14,14">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE7C3;" Style="{StaticResource Icon}" Foreground="{StaticResource SubText}"/>
+                                        <TextBlock Text="Boş dosyalar (0 bayt)" Style="{StaticResource H2}" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Margin="0,10,0,12">
+                                        <TextBlock x:Name="EmptyFilesCount" Text="—" Style="{StaticResource Big}"/>
+                                        <TextBlock Text="Sistem, program ve uygulama verisi klasörleri hariç" Style="{StaticResource Sub}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                                        <Button Style="{StaticResource BtnPrimary}" Content="İncele" Click="EmptyFiles_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Boş klasörler -->
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,14,14">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE8B7;" Style="{StaticResource Icon}" Foreground="#F6C35B"/>
+                                        <TextBlock Text="Boş klasörler" Style="{StaticResource H2}" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Margin="0,10,0,12">
+                                        <TextBlock x:Name="EmptyDirsCount" Text="—" Style="{StaticResource Big}"/>
+                                        <TextBlock Text="İçinde hiç dosya olmayan klasör ağaçları" Style="{StaticResource Sub}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                                        <Button Style="{StaticResource BtnPrimary}" Content="İncele" Click="EmptyDirs_Click"/>
+                                        <CheckBox x:Name="IncludeAppData" Content="AppData dahil" Margin="14,0,0,0" FontSize="12" Foreground="{StaticResource SubText}"
+                                                  Checked="IncludeAppData_Changed" Unchecked="IncludeAppData_Changed"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+
+                            <!-- Büyük dosyalar -->
+                            <Border Style="{StaticResource CardBorder}" Margin="0,0,14,14">
+                                <Grid>
+                                    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="&#xE9D2;" Style="{StaticResource Icon}" Foreground="{StaticResource Danger}"/>
+                                        <TextBlock Text="Büyük dosyalar (1 GB+)" Style="{StaticResource H2}" Margin="10,0,0,0"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="1" Margin="0,10,0,12">
+                                        <TextBlock x:Name="BigCount" Text="—" Style="{StaticResource Big}"/>
+                                        <TextBlock x:Name="BigSub" Text="" Style="{StaticResource Sub}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Row="2" Orientation="Horizontal">
+                                        <Button Style="{StaticResource BtnPrimary}" Content="İncele" Click="BigFiles_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </UniformGrid>
+
+                        <!-- Ayrıntı listesi -->
+                        <Border Grid.Row="2" Style="{StaticResource CardBorder}" Padding="16,14,16,8">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock x:Name="DetailTitle" Text="Bir kategori seç ve “İncele”ye bas" Style="{StaticResource H2}"/>
+                                        <TextBlock x:Name="DetailSub" Text="" Style="{StaticResource Sub}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                        <ComboBox x:Name="AgeFilter" Width="190" Height="34" Margin="0,0,8,0" Visibility="Collapsed" SelectionChanged="AgeFilter_Changed">
+                                            <ComboBoxItem Content="Seç: hepsi" Tag="0"/>
+                                            <ComboBoxItem Content="Seç: 7 günden eski" Tag="7"/>
+                                            <ComboBoxItem Content="Seç: 30 günden eski" Tag="30"/>
+                                            <ComboBoxItem Content="Seç: 90 günden eski" Tag="90"/>
+                                            <ComboBoxItem Content="Seç: 1 yıldan eski" Tag="365"/>
+                                        </ComboBox>
+                                        <Button Content="Tümünü seç" Margin="0,0,6,0" Click="SelectAll_Click"/>
+                                        <Button Content="Hiçbiri" Margin="0,0,12,0" Click="SelectNone_Click"/>
+                                        <Button x:Name="DetailDeleteBtn" Style="{StaticResource BtnDanger}" Click="DetailDelete_Click" IsEnabled="False">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="&#xE74D;" FontFamily="{StaticResource IconFont}" FontSize="13" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="#FF8C9B"/>
+                                                <TextBlock x:Name="DetailDeleteText" Text="Seçilenleri sil" Foreground="#FF8C9B"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+                                <ProgressBar x:Name="DetailProgress" Grid.Row="1" IsIndeterminate="True" Visibility="Collapsed" Margin="0,0,0,8"/>
+                                <Grid Grid.Row="2">
+                                    <ListBox x:Name="DetailList" Style="{StaticResource VList}" ItemTemplate="{StaticResource CleanTemplate}"
+                                             SelectionMode="Extended" KeyDown="DetailList_KeyDown" MouseDoubleClick="DetailList_DoubleClick"/>
+                                    <TextBlock x:Name="DetailEmpty" Text="Liste boş" Foreground="{StaticResource Muted}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>
